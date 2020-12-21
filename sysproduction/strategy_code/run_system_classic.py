@@ -9,116 +9,154 @@ this:
 
 """
 
-
-
-
-from syscore.objects import success, missing_data
+from syscore.objects import success, missing_data, arg_not_supplied
 
 from sysdata.configdata import Config
-from sysdata.production.optimal_positions import bufferedOptimalPositions
+from sysobjects.production.optimal_positions import bufferedOptimalPositions
 
-
-from sysproduction.data.currency_data import currencyData
+from sysproduction.data.currency_data import dataCurrency
 from sysproduction.data.capital import dataCapital
 from sysproduction.data.contracts import diagContracts
-from sysproduction.data.positions import updatePositions
+from sysproduction.data.positions import dataOptimalPositions
 from sysproduction.data.sim_data import dataSimData
 
 from sysproduction.diagnostic.backtest_state import store_backtest_state
-
 
 from syslogdiag.log import logtoscreen
 
 from systems.provided.futures_chapter15.basesystem import futures_system
 
+
 class runSystemClassic(object):
-    def __init__(self, data, strategy_name, backtest_config_filename="systems.provided.futures_chapter15.futures_config.yaml"):
+    def __init__(
+        self,
+        data,
+        strategy_name,
+        backtest_config_filename=arg_not_supplied,
+    ):
         self.data = data
         self.strategy_name = strategy_name
         self.backtest_config_filename = backtest_config_filename
 
-    def run_system_classic(self):
+        if backtest_config_filename is arg_not_supplied:
+            raise Exception("Need to supply config")
+
+    def run_backtest(self):
         strategy_name = self.strategy_name
         data = self.data
-        backtest_config_filename = self.backtest_config_filename
+
         capital_data = dataCapital(data)
         capital_value = capital_data.get_capital_for_strategy(strategy_name)
         if capital_data is missing_data:
-            ## critical log will send email
-            error_msg = "Capital data is missing for %s: can't run backtest" % strategy_name
+            # critical log will send email
+            error_msg = (
+                "Capital data is missing for %s: can't run backtest" %
+                strategy_name)
             data.log.critical(error_msg)
             raise Exception(error_msg)
 
-        currency_data = currencyData(data)
+        currency_data = dataCurrency(data)
         base_currency = currency_data.get_base_currency()
 
-        system = production_classic_futures_system(data, backtest_config_filename,
-                                            log=data.log, notional_trading_capital=capital_value,
-                                           base_currency=base_currency)
+        system = self.system_method(
+            notional_trading_capital=capital_value, base_currency=base_currency
+        )
 
         updated_buffered_positions(data, strategy_name, system)
 
-        store_backtest_state(data, system, strategy_name=strategy_name,
-                             backtest_config_filename=backtest_config_filename)
+        store_backtest_state(data, system, strategy_name=strategy_name)
 
         return success
 
+    def system_method(self, notional_trading_capital=None, base_currency=None):
+        data = self.data
+        backtest_config_filename = self.backtest_config_filename
 
-def production_classic_futures_system(data, config_filename, log=logtoscreen("futures_system"),
-                   notional_trading_capital=1000000, base_currency="USD"):
+        system = production_classic_futures_system(
+            data,
+            backtest_config_filename,
+            log=data.log,
+            notional_trading_capital=notional_trading_capital,
+            base_currency=base_currency,
+        )
+
+        return system
+
+
+def production_classic_futures_system(
+    data,
+    config_filename,
+    log=logtoscreen("futures_system"),
+    notional_trading_capital=None,
+    base_currency=None,
+):
 
     log_level = "on"
 
-    # ugly but once you've established a pattern...
-    sim_data = dataSimData(data).sim_data()
-    config = Config(
-            config_filename)
+    sim_data = dataSimData(data)
+    config = Config(config_filename)
 
     # Overwrite capital
-    config.notional_trading_capital = notional_trading_capital
-    config.base_currency = base_currency
+    if notional_trading_capital is not None:
+        config.notional_trading_capital = notional_trading_capital
+
+    if base_currency is not None:
+        config.base_currency = base_currency
 
     system = futures_system(data=sim_data, config=config)
-    system.log = log
+    system._log = log
 
     system.set_logging_level(log_level)
 
     return system
 
 
-
 def updated_buffered_positions(data, strategy_name, system):
     log = data.log
 
-    update_positions = updatePositions(data)
+    data_optimal_positions = dataOptimalPositions(data)
 
     list_of_instruments = system.get_instrument_list()
     for instrument_code in list_of_instruments:
-        try:
-            lower_buffer, upper_buffer = get_position_buffers_from_system(system, instrument_code)
-            position_entry = construct_position_entry(data, system, instrument_code, lower_buffer, upper_buffer)
-            update_positions.update_optimal_position_for_strategy_and_instrument(strategy_name, instrument_code, position_entry)
-            log.msg("New buffered positions %.3f %.3f" %
-                         (position_entry.lower_position,
-                          position_entry.upper_position), instrument_code=instrument_code)
-        except Exception as e:
-            log.critical("Couldn't get or update buffered positions error %s" % e, instrument_code=instrument_code)
+        lower_buffer, upper_buffer = get_position_buffers_from_system(
+            system, instrument_code
+        )
+        position_entry = construct_position_entry(
+            data, system, instrument_code, lower_buffer, upper_buffer
+        )
+        data_optimal_positions.update_optimal_position_for_strategy_and_instrument(
+            strategy_name, instrument_code, position_entry)
+        log.msg(
+            "New buffered positions %.3f %.3f" %
+            (position_entry.lower_position,
+             position_entry.upper_position),
+            instrument_code=instrument_code,
+        )
 
     return success
 
+
 def get_position_buffers_from_system(system, instrument_code):
     buffers = system.portfolio.get_buffers_for_position(
-        instrument_code)  ## get the upper and lower edges of the buffer
+        instrument_code
+    )  # get the upper and lower edges of the buffer
     lower_buffer = buffers.iloc[-1].bot_pos
     upper_buffer = buffers.iloc[-1].top_pos
 
     return lower_buffer, upper_buffer
 
-def construct_position_entry(data, system, instrument_code, lower_buffer, upper_buffer):
+
+def construct_position_entry(
+        data,
+        system,
+        instrument_code,
+        lower_buffer,
+        upper_buffer):
     diag_contracts = diagContracts(data)
     reference_price = system.rawdata.get_daily_prices(instrument_code).iloc[-1]
     reference_contract = diag_contracts.get_priced_contract_id(instrument_code)
-    position_entry = bufferedOptimalPositions(lower_buffer, upper_buffer, reference_price, reference_contract)
+    position_entry = bufferedOptimalPositions(
+        lower_buffer, upper_buffer, reference_price, reference_contract
+    )
 
     return position_entry
-

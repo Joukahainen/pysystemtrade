@@ -1,5 +1,38 @@
 # Release notes
 
+## Version 0.60.0
+
+Split out control configuration from other YAML files (**YOU WILL NEED TO CHANGE PRIVATE CONFIG** look at the production docs!)
+Refactoring of run and control processes mostly into new syscontrol module
+Added simple monitoring tool
+Added email 'to' option (**YOU WILL NEED TO CHANGE PRIVATE CONFIG TO INCLUDE email_to parameter**)
+
+## Version 0.52.0
+
+Mostly refactoring and documenting the creation and storage of data
+
+
+## Version 0.51.0
+
+Essentially 'finished' production.md (in as much as anything can be finished...)
+Changed data Blobs so now take lists of objects rather than str, easier to see dependencies
+
+## Version 0.50.0
+
+(Done loads of work but forgotten to update the version number or this file. So let's reward ourselves with a 0.20 version bump. The following list is almost certainly incomplete...)
+Done loads of documentation for production
+Added position limits
+Removed broker base classes as redundant
+Minimum tick size used in setting limit orders
+Stopped double counting of volumes when daily/intraday data mixed
+Added startup script
+Fixed issues with time zone mismatches
+Added trades report, strategy report, signals report, risk report, p&l report
+Position locks
+Added interactive diagnostics, interactive order stack, interactive controls
+Execution algo!
+Added capability to trade
+
 ## Version 0.30.0
 
 Introduced capital model for production

@@ -3,6 +3,9 @@ import datetime
 
 from syscore.dateutils import long_to_datetime, datetime_to_long
 
+LOG_MAPPING = dict(msg=0, terse=1, warn=2, error=3, critical=4)
+INVERSE_MAP = dict([(value, key) for key, value in LOG_MAPPING.items()])
+
 
 class logger(object):
     """
@@ -54,7 +57,8 @@ class logger(object):
             other_attributes = kwargs
 
             log_attributes = get_update_attributes_list(
-                log_attributes, other_attributes)
+                log_attributes, other_attributes
+            )
 
         elif hasattr(type, "attributes"):
             # probably a log
@@ -62,7 +66,8 @@ class logger(object):
             parent_attributes = type.attributes
 
             log_attributes = get_update_attributes_list(
-                parent_attributes, new_attributes)
+                parent_attributes, new_attributes
+            )
 
         else:
             raise Exception(
@@ -91,8 +96,10 @@ class logger(object):
         attribute_desc = [
             keyname + ": " + str(attributes[keyname]) for keyname in attr_keys
         ]
-        return "Logger (%s) attributes- %s" % (self._log_level,
-                                               ", ".join(attribute_desc))
+        return "Logger (%s) attributes- %s" % (
+            self._log_level,
+            ", ".join(attribute_desc),
+        )
 
     def setup(self, **kwargs):
 
@@ -101,8 +108,8 @@ class logger(object):
         log_attributes = new_log.attributes
         passed_attributes = kwargs
 
-        new_attributes = get_update_attributes_list(log_attributes,
-                                                    passed_attributes)
+        new_attributes = get_update_attributes_list(
+            log_attributes, passed_attributes)
 
         setattr(new_log, "attributes", new_attributes)
         setattr(new_log, "_log_level", self.logging_level())
@@ -113,68 +120,49 @@ class logger(object):
         log_attributes = self.attributes
         passed_attributes = kwargs
 
-        new_attributes = get_update_attributes_list(log_attributes,
-                                                    passed_attributes)
+        new_attributes = get_update_attributes_list(
+            log_attributes, passed_attributes)
 
         setattr(self, "attributes", new_attributes)
 
     def msg(self, text, **kwargs):
-        return self.log(text, msglevel=0, **kwargs)
+        msg_level = LOG_MAPPING["msg"]
+        return self.log(text, msglevel=msg_level, **kwargs)
 
     def terse(self, text, **kwargs):
-        return self.log(text, msglevel=1, **kwargs)
+        msg_level = LOG_MAPPING["terse"]
+        return self.log(text, msglevel=msg_level, **kwargs)
 
     def warn(self, text, **kwargs):
-        return self.log(text, msglevel=2, **kwargs)
+        msg_level = LOG_MAPPING["warn"]
+        return self.log(text, msglevel=msg_level, **kwargs)
 
     def error(self, text, **kwargs):
-        return self.log(text, msglevel=3, **kwargs)
+        msg_level = LOG_MAPPING["error"]
+        return self.log(text, msglevel=msg_level, **kwargs)
 
     def critical(self, text, **kwargs):
-        return self.log(text, msglevel=4, **kwargs)
-
-    def get_last_used_log_id(self):
-        """
-        Get last log id used. This should be stored in the underlying database.
-
-        If no last log id, return None
-
-        :return: int
-        """
-        raise NotImplementedError("You need to implement this method in an inherited class or use an inherited claass eg logToMongod")
-
-    def update_log_id(self):
-        """
-        Update the current stored log id
-
-        :return: None
-        """
-        raise NotImplementedError("You need to implement this method in an inherited class or use an inherited claass eg logToMongod")
+        msg_level = LOG_MAPPING["critical"]
+        return self.log(text, msglevel=msg_level, **kwargs)
 
 
-    def get_next_log_id(self):
+    def get_next_log_id(self) -> int:
         """
         Get next log id
 
         :return: int
         """
-        last_id = self.get_last_used_log_id()
-        if last_id is None:
-            last_id = -1
-
-        next_id = last_id+1
-
-        self.update_log_id(next_id)
-
-        return next_id
+        raise NotImplementedError(
+            "You need to implement this method in an inherited class or use an inherited claass eg logToMongod"
+        )
 
     def log(self, text, msglevel=0, **kwargs):
         log_attributes = self.attributes
         passed_attributes = kwargs
 
         log_id = self.get_next_log_id()
-        use_attributes = get_update_attributes_list(log_attributes,
-                                                    passed_attributes)
+        use_attributes = get_update_attributes_list(
+            log_attributes, passed_attributes)
 
         return self.log_handle_caller(msglevel, text, use_attributes, log_id)
 
@@ -186,12 +174,12 @@ class logger(object):
     """
     Following two methods implement context manager
     """
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
-
 
 
 def get_update_attributes_list(parent_attributes, new_attributes):
@@ -216,7 +204,12 @@ class logtoscreen(logger):
 
     """
 
-    def log_handle_caller(self, msglevel, text, use_attributes, log_id_NOT_USED):
+    def log_handle_caller(
+            self,
+            msglevel,
+            text,
+            use_attributes,
+            log_id_NOT_USED):
         """
         >>> log=logtoscreen("base_system", log_level="off") ## this won't do anything
         >>> log.log("this wont print")
@@ -256,25 +249,51 @@ class logtoscreen(logger):
         if msglevel == 4:
             raise Exception(text)
 
+    def get_next_log_id(self) -> int:
+        last_id = self.get_last_used_log_id()
+        next_id = last_id+1
+
+        self.update_log_id(next_id)
+
+        return next_id
+
     def get_last_used_log_id(self):
-        return getattr(self, "_log_id", None)
+        return getattr(self, "_log_id", 0)
 
     def update_log_id(self, log_id):
         self._log_id = log_id
 
-MSG_LEVEL_DICT = dict(m0="", m1="", m2="[Warning]", m3="[Error]", m4="*CRITICAL*")
-TEXTMSG_LEVEL_DICT = {"": 0, }
 
-LEVEL_ID = "_Level" #use underscores so less chance of a conflict with labels used by users
+MSG_LEVEL_DICT = dict(
+    m0="",
+    m1="",
+    m2="[Warning]",
+    m3="[Error]",
+    m4="*CRITICAL*")
+TEXTMSG_LEVEL_DICT = {
+    "": 0,
+}
+
+LEVEL_ID = (
+    "_Level"  # use underscores so less chance of a conflict with labels used by users
+)
 TIMESTAMP_ID = "_Timestamp"
 TEXT_ID = "_Text"
-LOG_RECORD_ID ="_Log_Record_id"
+LOG_RECORD_ID = "_Log_Record_id"
+
 
 class logEntry(object):
     """
     Abstraction for database log entries
     """
-    def __init__(self, text, log_timestamp = None, msglevel=0, input_attributes={}, log_id=0):
+
+    def __init__(
+            self,
+            text,
+            log_timestamp=None,
+            msglevel=0,
+            input_attributes={},
+            log_id=0):
 
         use_attributes = copy(input_attributes)
         log_dict = copy(use_attributes)
@@ -317,14 +336,23 @@ class logEntry(object):
 
         log_timestamp = long_to_datetime(log_timestamp_aslong)
 
-        log_entry = logEntry(text, log_timestamp=log_timestamp,
-                             msglevel=msg_level, input_attributes=input_attributes, log_id=log_id)
+        log_entry = logEntry(
+            text,
+            log_timestamp=log_timestamp,
+            msglevel=msg_level,
+            input_attributes=input_attributes,
+            log_id=log_id,
+        )
 
         return log_entry
 
     def __repr__(self):
-        return "%s %s %s %s" % (self._timestamp.strftime("%Y-%m-%d:%H%M.%S"),
-                                str(self._use_attributes), self._msglevel_text, self._text)
+        return "%s %s %s %s" % (
+            self._timestamp.strftime("%Y-%m-%d:%H%M.%S"),
+            str(self._use_attributes),
+            self._msglevel_text,
+            self._text,
+        )
 
     def log_dict(self):
         return self._log_dict
@@ -337,9 +365,20 @@ class logEntry(object):
     def text(self):
         return self._text
 
+    @property
+    def level(self):
+        return self._msglevel
+
+    @property
+    def msg_level(self):
+        return self._msglevel_text
+
+    @property
+    def attributes(self):
+        return self._use_attributes
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     import doctest
+
     doctest.testmod()

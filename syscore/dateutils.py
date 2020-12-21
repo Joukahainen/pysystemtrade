@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 
 from syscore.genutils import sign
+from syscore.objects import missing_data
+
 """
 First some constants
 """
@@ -15,13 +17,13 @@ First some constants
 CALENDAR_DAYS_IN_YEAR = 365.25
 
 BUSINESS_DAYS_IN_YEAR = 256.0
-ROOT_BDAYS_INYEAR = BUSINESS_DAYS_IN_YEAR**.5
+ROOT_BDAYS_INYEAR = BUSINESS_DAYS_IN_YEAR ** 0.5
 
 WEEKS_IN_YEAR = CALENDAR_DAYS_IN_YEAR / 7.0
-ROOT_WEEKS_IN_YEAR = WEEKS_IN_YEAR**.5
+ROOT_WEEKS_IN_YEAR = WEEKS_IN_YEAR ** 0.5
 
 MONTHS_IN_YEAR = 12.0
-ROOT_MONTHS_IN_YEAR = MONTHS_IN_YEAR**.5
+ROOT_MONTHS_IN_YEAR = MONTHS_IN_YEAR ** 0.5
 
 ARBITRARY_START = datetime.datetime(1900, 1, 1)
 
@@ -35,9 +37,8 @@ UNIXTIME_CONVERTER = 1e9
 
 UNIXTIME_IN_YEAR = UNIXTIME_CONVERTER * SECONDS_IN_YEAR
 
-
-
 MONTH_LIST = ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"]
+
 
 def month_from_contract_letter(contract_letter):
     """
@@ -52,7 +53,7 @@ def month_from_contract_letter(contract_letter):
     except ValueError:
         return None
 
-    return month_number+1
+    return month_number + 1
 
 
 def contract_month_from_number(month_number):
@@ -63,7 +64,8 @@ def contract_month_from_number(month_number):
     :return: str
     """
 
-    return MONTH_LIST[month_number-1]
+    return MONTH_LIST[month_number - 1]
+
 
 def expiry_date(expiry_ident):
     """
@@ -94,20 +96,23 @@ def expiry_date(expiry_ident):
         if len(expiry_ident) == 6:
             expiry_date = datetime.datetime.strptime(expiry_ident, "%Y%m")
         elif len(expiry_ident) == 8:
-            if expiry_ident[6:8]=="00":
-                expiry_ident = expiry_ident[:6]+"01"
+            if expiry_ident[6:8] == "00":
+                expiry_ident = expiry_ident[:6] + "01"
 
             expiry_date = datetime.datetime.strptime(expiry_ident, "%Y%m%d")
         else:
             raise Exception("")
 
     elif isinstance(expiry_ident, datetime.datetime) or isinstance(
-            expiry_ident, datetime.date):
+        expiry_ident, datetime.date
+    ):
         expiry_date = expiry_ident
 
     else:
-        raise Exception("expiry_ident needs to be a string with 6 or 8 digits, a datetime, or a date;"
-                        f" type={type(expiry_ident)}, value={expiry_ident}")
+        raise Exception(
+            "expiry_ident needs to be a string with 6 or 8 digits, a datetime, or a date;"
+            f" type={type(expiry_ident)}, value={expiry_ident}"
+        )
 
     # 'Natural' form is datetime
     return expiry_date
@@ -132,8 +137,12 @@ def expiry_diff(carry_row, floor_date_diff=20):
     """
     if carry_row.PRICE_CONTRACT == "" or carry_row.CARRY_CONTRACT == "":
         return np.nan
-    ans = float((expiry_date(carry_row.CARRY_CONTRACT) -
-                 expiry_date(carry_row.PRICE_CONTRACT)).days)
+    ans = float(
+        (
+            expiry_date(carry_row.CARRY_CONTRACT)
+            - expiry_date(carry_row.PRICE_CONTRACT)
+        ).days
+    )
     if abs(ans) < floor_date_diff:
         ans = sign(ans) * floor_date_diff
     ans = ans / CALENDAR_DAYS_IN_YEAR
@@ -142,12 +151,13 @@ def expiry_diff(carry_row, floor_date_diff=20):
 
 
 class fit_dates_object(object):
-    def __init__(self,
-                 fit_start,
-                 fit_end,
-                 period_start,
-                 period_end,
-                 no_data=False):
+    def __init__(
+            self,
+            fit_start,
+            fit_end,
+            period_start,
+            period_end,
+            no_data=False):
         setattr(self, "fit_start", fit_start)
         setattr(self, "fit_end", fit_end)
         setattr(self, "period_start", period_start)
@@ -156,13 +166,17 @@ class fit_dates_object(object):
 
     def __repr__(self):
         if self.no_data:
-            return "Fit without data, use from %s to %s" % (self.period_start,
-                                                            self.period_end)
+            return "Fit without data, use from %s to %s" % (
+                self.period_start,
+                self.period_end,
+            )
         else:
-            return "Fit from %s to %s, use in %s to %s" % (self.fit_start,
-                                                           self.fit_end,
-                                                           self.period_start,
-                                                           self.period_end)
+            return "Fit from %s to %s, use in %s to %s" % (
+                self.fit_start,
+                self.fit_end,
+                self.period_start,
+                self.period_end,
+            )
 
 
 def generate_fitting_dates(data, date_method, rollyears=20):
@@ -178,8 +192,8 @@ def generate_fitting_dates(data, date_method, rollyears=20):
 
     if date_method not in ["in_sample", "rolling", "expanding"]:
         raise Exception(
-            "don't recognise date_method %s should be one of in_sample, expanding, rolling"
-            % date_method)
+            "don't recognise date_method %s should be one of in_sample, expanding, rolling" %
+            date_method)
 
     if isinstance(data, list):
         start_date = min([dataitem.index[0] for dataitem in data])
@@ -194,9 +208,11 @@ def generate_fitting_dates(data, date_method, rollyears=20):
         return [fit_dates_object(start_date, end_date, start_date, end_date)]
 
     # generate list of dates, one year apart, including the final date
-    yearstarts = list(pd.date_range(start_date, end_date, freq="12M")) + [
-        end_date
-    ]
+    yearstarts = list(
+        pd.date_range(
+            start_date,
+            end_date,
+            freq="12M")) + [end_date]
 
     # loop through each period
     periods = []
@@ -213,38 +229,46 @@ def generate_fitting_dates(data, date_method, rollyears=20):
             fit_start = yearstarts[yearidx_to_use]
         else:
             raise Exception(
-                "don't recognise date_method %s should be one of in_sample, expanding, rolling"
-                % date_method)
+                "don't recognise date_method %s should be one of in_sample, expanding, rolling" %
+                date_method)
 
-        if date_method in ['rolling', 'expanding']:
+        if date_method in ["rolling", "expanding"]:
             fit_end = period_start
         else:
             raise Exception("don't recognise date_method %s " % date_method)
 
         periods.append(
-            fit_dates_object(fit_start, fit_end, period_start, period_end))
+            fit_dates_object(
+                fit_start,
+                fit_end,
+                period_start,
+                period_end))
 
-    if date_method in ['rolling', 'expanding']:
+    if date_method in ["rolling", "expanding"]:
         # add on a dummy date for the first year, when we have no data
         periods = [
             fit_dates_object(
-                start_date,
-                start_date,
-                start_date,
-                yearstarts[1],
-                no_data=True)
+                start_date, start_date, start_date, yearstarts[1], no_data=True
+            )
         ] + periods
 
     return periods
 
-def time_matches(index_entry, closing_time=pd.DateOffset(hours=12, minutes=0, seconds=0)):
-    if index_entry.hour == closing_time.hours and \
-        index_entry.minute == closing_time.minutes and \
-        index_entry.second == closing_time.seconds:
+
+def time_matches(
+    index_entry, closing_time=pd.DateOffset(hours=12, minutes=0, seconds=0)
+):
+    if (
+        index_entry.hour == closing_time.hours
+        and index_entry.minute == closing_time.minutes
+        and index_entry.second == closing_time.seconds
+    ):
 
         return True
     else:
         return False
+
+
 
 """
 Convert date into a decimal, and back again
@@ -254,31 +278,47 @@ LONG_TIME_FORMAT = "%H%M%S.%f"
 LONG_JUST_DATE_FORMAT = "%Y%m%d"
 CONVERSION_FACTOR = 10000
 
+
 def datetime_to_long(date_to_convert):
     as_str = date_to_convert.strftime(LONG_DATE_FORMAT)
     as_float = float(as_str)
-    return int(as_float*CONVERSION_FACTOR)
+    return int(as_float * CONVERSION_FACTOR)
+
 
 def long_to_datetime(int_to_convert):
-    as_float = float(int_to_convert)/CONVERSION_FACTOR
-    str_to_convert='%.6f' % as_float
+    as_float = float(int_to_convert) / CONVERSION_FACTOR
+    str_to_convert = "%.6f" % as_float
 
-    ## have to do this because of leap seconds
-    time_string, dot, microseconds = str_to_convert.partition('.')
+    # have to do this because of leap seconds
+    time_string, dot, microseconds = str_to_convert.partition(".")
     utc_time_tuple = time.strptime(str_to_convert, LONG_DATE_FORMAT)
-    as_datetime = datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=calendar.timegm(utc_time_tuple))
-    as_datetime= as_datetime.replace(microsecond=datetime.datetime.strptime(microseconds, '%f').microsecond)
+    as_datetime = datetime.datetime(1970, 1, 1) + datetime.timedelta(
+        seconds=calendar.timegm(utc_time_tuple)
+    )
+    as_datetime = as_datetime.replace(
+        microsecond=datetime.datetime.strptime(microseconds, "%f").microsecond
+    )
 
     return as_datetime
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import doctest
+
     doctest.testmod()
 
+NOTIONAL_CLOSING_TIME = dict(hours=23, minutes=0, seconds=0)
+NOTIONAL_CLOSING_TIME_AS_PD_OFFSET = pd.DateOffset(hours = NOTIONAL_CLOSING_TIME['hours'],
+                                                   minutes = NOTIONAL_CLOSING_TIME['minutes'],
+                                                   seconds = NOTIONAL_CLOSING_TIME['seconds'])
 
-def adjust_timestamp(index_entry, actual_close = pd.DateOffset(hours = 23, minutes=0, seconds=0),
-                     original_close = pd.DateOffset(hours = 23, minutes=0, seconds=0), time_offset =pd.DateOffset(hours=0)):
-    if (index_entry.hour == 0 and index_entry.minute == 0 and index_entry.second == 0):
+def adjust_timestamp(
+    index_entry,
+    actual_close=NOTIONAL_CLOSING_TIME_AS_PD_OFFSET,
+    original_close=pd.DateOffset(hours=23, minutes=0, seconds=0),
+    time_offset=pd.DateOffset(hours=0),
+):
+    if index_entry.hour == 0 and index_entry.minute == 0 and index_entry.second == 0:
         new_index_entry = index_entry.date() + actual_close
     elif time_matches(index_entry, original_close):
         new_index_entry = index_entry.date() + actual_close
@@ -287,24 +327,37 @@ def adjust_timestamp(index_entry, actual_close = pd.DateOffset(hours = 23, minut
 
     return new_index_entry
 
-def get_datetime_input(prompt, allow_default = True):
+
+def strip_tz_info(timestamp_with_tz_info):
+    ts = timestamp_with_tz_info.timestamp()
+    new_timestamp = datetime.datetime.fromtimestamp(ts)
+    return new_timestamp
+
+
+def get_datetime_input(prompt, allow_default=True, allow_no_arg=False):
     invalid_input = True
-    input_str = prompt+": Enter date and time in format %Y%-%m-%d eg '2020-05-30' OR '%Y-%m-%d %H:%M:%S' eg '2020-05-30 14:04:11'"
+    input_str = (
+        prompt +
+        ": Enter date and time in format %Y%-%m-%d eg '2020-05-30' OR '%Y-%m-%d %H:%M:%S' eg '2020-05-30 14:04:11'")
     if allow_default:
-        input_str = input_str+" <RETURN for now>"
+        input_str = input_str + " <RETURN for now>"
+    if allow_no_arg:
+        input_str = input_str + " <SPACE for no date>' "
     while invalid_input:
         ans = input(input_str)
-        if ans=="" and allow_default:
+        if ans == "" and allow_default:
             return datetime.datetime.now()
+        if ans == " " and allow_no_arg:
+            return None
         try:
-            if len(ans)==10:
+            if len(ans) == 10:
                 ans = datetime.datetime.strptime(ans, "%Y-%m-%d")
-            elif len(ans)==19:
+            elif len(ans) == 19:
                 ans = datetime.datetime.strptime(ans, "%Y-%m-%d %H:%M:%S")
             else:
-                ## problems formatting will also raise value error
+                # problems formatting will also raise value error
                 raise ValueError
-            invalid_input=False
+            invalid_input = False
             break
 
         except ValueError:
@@ -312,3 +365,69 @@ def get_datetime_input(prompt, allow_default = True):
             continue
 
     return ans
+
+
+class tradingStartAndEnd(object):
+    def __init__(self, hour_tuple):
+        self._start_time = hour_tuple[0]
+        self._end_time = hour_tuple[1]
+
+    def okay_to_trade_now(self):
+        datetime_now = datetime.datetime.now()
+        if datetime_now >= self._start_time and datetime_now <= self._end_time:
+            return True
+        else:
+            return False
+
+    def less_than_one_hour_left(self):
+        datetime_now = datetime.datetime.now()
+        time_left = self._end_time - datetime_now
+        if time_left.total_seconds() < SECONDS_PER_HOUR:
+            return True
+        else:
+            return False
+
+
+class manyTradingStartAndEnd(object):
+    def __init__(self, list_of_trading_hours):
+        """
+
+        :param list_of_trading_hours: list of tuples, both datetime, first is start and second is end
+        """
+
+        my_start_and_end = []
+        for hour_tuple in list_of_trading_hours:
+            this_period = tradingStartAndEnd(hour_tuple)
+            my_start_and_end.append(this_period)
+
+        self._my_start_and_end = my_start_and_end
+
+    def okay_to_trade_now(self):
+        for check_period in self._my_start_and_end:
+            if check_period.okay_to_trade_now():
+                return True
+        return False
+
+    def less_than_one_hour_left(self):
+        for check_period in self._my_start_and_end:
+            if check_period.okay_to_trade_now():
+                if check_period.less_than_one_hour_left():
+                    return True
+                else:
+                    return False
+
+        return None
+
+
+short_date_string = "%m/%d %H:%M:%S"
+missing_string =    "     ???      "
+
+
+def last_run_or_heartbeat_from_date_or_none(last_run_or_heartbeat):
+    if last_run_or_heartbeat is missing_data:
+        last_run_or_heartbeat = missing_string
+    else:
+        last_run_or_heartbeat = last_run_or_heartbeat.strftime(
+            short_date_string)
+
+    return last_run_or_heartbeat

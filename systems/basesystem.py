@@ -2,8 +2,7 @@ from sysdata.configdata import Config
 from syslogdiag.log import logtoscreen
 from systems.system_cache import systemCache, base_system_cache
 
-NOT_PASSED= object()
-
+NOT_PASSED = object()
 """
 This is used for items which affect an entire system, not just one instrument
 """
@@ -12,8 +11,9 @@ ALL_KEYNAME = "all"
 # Used for process pooling
 DEFAULT_MAX_WORKERS = 50
 
+
 class System(object):
-    '''
+    """
     system objects are used for signal processing in a 'tree' like framework
 
 
@@ -27,13 +27,14 @@ class System(object):
 
     The system only has one method 'of its own' which is get_instrument_list
 
-    '''
+    """
 
-    def __init__(self,
-                 stage_list,
-                 data,
-                 config=None,
-                 log=logtoscreen("base_system")):
+    def __init__(
+            self,
+            stage_list,
+            data,
+            config=None,
+            log=logtoscreen("base_system")):
         """
         Create a system object for doing simulations or live trading
 
@@ -50,7 +51,7 @@ class System(object):
 
         >>> from systems.stage import SystemStage
         >>> stage=SystemStage()
-        >>> from sysdata.csv.csv_sim_futures_data import csvFuturesSimData
+        >>> from sysdata.sim.csv_futures_sim_data import csvFuturesSimData
         >>> data=csvFuturesSimData()
         >>> System([stage], data)
         System base_system with .config, .data, and .stages: unnamed
@@ -63,7 +64,7 @@ class System(object):
 
         setattr(self, "data", data)
         setattr(self, "config", config)
-        setattr(self, "log", log)
+        self._log = log
 
         self.config._system_init(self)
         self.data._system_init(self)
@@ -94,7 +95,8 @@ class System(object):
             if sub_name in stage_names:
                 raise Exception(
                     "You have duplicate subsystems with the name %s. Remove "
-                    "one of them, or change a name." % sub_name)
+                    "one of them, or change a name." % sub_name
+                )
 
             setattr(self, sub_name, stage)
 
@@ -123,7 +125,11 @@ class System(object):
         sslist = ", ".join(self._stage_names)
         description = "System %s with .config, .data, and .stages: " % self.name
 
-        return description+sslist
+        return description + sslist
+
+    @property
+    def log(self):
+        return self._log
 
     def set_logging_level(self, new_log_level):
         """
@@ -149,18 +155,22 @@ class System(object):
 
     @process_pool.setter
     def process_pool(self, process_pool):
-        assert type(process_pool) is bool
+        assert isinstance(process_pool, bool)
         self._process_pool = process_pool
 
     @property
     def process_pool_max_workers(self):
-        # max_workers when apply process pooling to get certain results in parallel
-        max_workers = getattr(self, "_process_pool_max_workers", DEFAULT_MAX_WORKERS)
+        # max_workers when apply process pooling to get certain results in
+        # parallel
+        max_workers = getattr(
+            self,
+            "_process_pool_max_workers",
+            DEFAULT_MAX_WORKERS)
         return max_workers
 
     @process_pool_max_workers.setter
     def process_pool_max_workers(self, max_workers):
-        assert type(max_workers) is int
+        assert isinstance(max_workers, int)
         self._process_pool_max_workers = max_workers
 
     # note we have to use this special cache here, or we get recursion problems
@@ -174,22 +184,26 @@ class System(object):
         try:
             # if instrument weights specified in config ...
             instrument_list = self.config.instrument_weights.keys()
-        except:
+        except BaseException:
             try:
                 # alternative place if no instrument weights
                 instrument_list = self.config.instruments
-            except:
+            except BaseException:
                 try:
                     # okay maybe not, must be in data
                     instrument_list = self.data.get_instrument_list()
-                except:
+                except BaseException:
                     raise Exception("Can't find instrument_list anywhere!")
 
         instrument_list = sorted(set(list(instrument_list)))
         return instrument_list
 
+    @property
+    def stage_names(self):
+        return ["data"] + self._stage_names
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import doctest
+
     doctest.testmod()
